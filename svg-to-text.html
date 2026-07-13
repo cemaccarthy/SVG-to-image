@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>SVG → Text</title>
+<style>
+  :root{
+    --ink:#1b1f1c;
+    --paper:#f6f4ee;
+    --line:#d8d3c4;
+    --moss:#4a5d43;
+    --moss-dark:#38472f;
+    --amber:#c8843a;
+    --mono: 'SF Mono', ui-monospace, 'Menlo', monospace;
+    --serif: 'New York', 'Iowan Old Style', Georgia, serif;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--paper);
+    color:var(--ink);
+    font-family:-apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif;
+    min-height:100dvh;
+    padding: max(20px, env(safe-area-inset-top)) 18px max(28px, env(safe-area-inset-bottom));
+    display:flex;
+    flex-direction:column;
+    gap:18px;
+  }
+  header{
+    padding-top:6px;
+  }
+  .eyebrow{
+    font-family:var(--mono);
+    font-size:11px;
+    letter-spacing:.14em;
+    text-transform:uppercase;
+    color:var(--moss);
+    margin:0 0 6px;
+  }
+  h1{
+    font-family:var(--serif);
+    font-weight:600;
+    font-size:28px;
+    margin:0;
+    line-height:1.15;
+    letter-spacing:-0.01em;
+  }
+  .sub{
+    margin:8px 0 0;
+    font-size:14.5px;
+    line-height:1.5;
+    color:#585b52;
+    max-width:46ch;
+  }
+
+  #dropzone{
+    border:1.5px dashed var(--line);
+    border-radius:14px;
+    background:#fffdf8;
+    padding:28px 18px;
+    text-align:center;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:10px;
+    transition: border-color .15s ease, background .15s ease;
+  }
+  #dropzone.drag{
+    border-color:var(--moss);
+    background:#f1f4ec;
+  }
+  #dropzone svg{width:30px;height:30px;stroke:var(--moss);}
+  #dropzone .dz-title{
+    font-size:15px;
+    font-weight:600;
+  }
+  #dropzone .dz-sub{
+    font-size:13px;
+    color:#7a7d72;
+  }
+  #fileInput{ display:none; }
+  .choose-btn{
+    margin-top:4px;
+    background:var(--moss);
+    color:#fff;
+    border:none;
+    padding:10px 18px;
+    border-radius:100px;
+    font-size:14px;
+    font-weight:600;
+    letter-spacing:.01em;
+  }
+  .choose-btn:active{ background:var(--moss-dark); }
+
+  #fileMeta{
+    display:none;
+    font-family:var(--mono);
+    font-size:12.5px;
+    color:var(--moss-dark);
+    background:#eef1e8;
+    border-radius:8px;
+    padding:8px 12px;
+    align-items:center;
+    justify-content:space-between;
+    gap:10px;
+  }
+  #fileMeta.show{ display:flex; }
+  #fileMeta button{
+    background:none;border:none;color:var(--amber);font-family:var(--mono);
+    font-size:12px; font-weight:700; padding:0;
+  }
+
+  .tabs{
+    display:flex;
+    gap:6px;
+    display:none;
+  }
+  .tabs.show{ display:flex; }
+  .tab{
+    flex:1;
+    text-align:center;
+    padding:9px 4px;
+    border-radius:9px;
+    font-size:12.5px;
+    font-weight:600;
+    color:#6d7065;
+    background:#eeece3;
+    border:none;
+  }
+  .tab.active{
+    background:var(--moss);
+    color:#fff;
+  }
+
+  #resultWrap{ display:none; flex-direction:column; gap:10px; flex:1; min-height:0;}
+  #resultWrap.show{ display:flex; }
+
+  #resultLabel{
+    font-family:var(--mono);
+    font-size:11px;
+    letter-spacing:.1em;
+    text-transform:uppercase;
+    color:#8a8d80;
+  }
+
+  textarea{
+    width:100%;
+    flex:1;
+    min-height:220px;
+    resize:vertical;
+    background:#fffdf8;
+    border:1px solid var(--line);
+    border-radius:12px;
+    padding:14px;
+    font-family:var(--mono);
+    font-size:12.5px;
+    line-height:1.55;
+    color:#2b2e27;
+  }
+  textarea:focus{ outline:2px solid var(--moss); outline-offset:1px; }
+
+  .empty-note{
+    font-size:13px;
+    color:#8a8d80;
+    font-style:italic;
+    padding:6px 2px;
+  }
+
+  .actions{
+    display:flex;
+    gap:10px;
+  }
+  .actions button{
+    flex:1;
+    padding:13px 10px;
+    border-radius:11px;
+    font-size:14.5px;
+    font-weight:600;
+    border:none;
+  }
+  #copyBtn{
+    background:var(--ink);
+    color:#fff;
+  }
+  #copyBtn.copied{ background:var(--amber); }
+  #downloadBtn{
+    background:#fff;
+    color:var(--ink);
+    border:1.5px solid var(--ink);
+  }
+
+  #errorBox{
+    display:none;
+    background:#fbeaea;
+    color:#8a3131;
+    border:1px solid #e3b6b6;
+    border-radius:10px;
+    padding:10px 12px;
+    font-size:13px;
+  }
+  #errorBox.show{ display:block; }
+
+  footer{
+    margin-top:auto;
+    text-align:center;
+    font-size:11.5px;
+    color:#a3a595;
+    font-family:var(--mono);
+    padding-top:6px;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <p class="eyebrow">Local &amp; private — nothing leaves your phone</p>
+  <h1>SVG → Text</h1>
+  <p class="sub">Drop in an .svg file to pull out its raw markup, or just the words drawn inside it.</p>
+</header>
+
+<div id="dropzone">
+  <svg viewBox="0 0 24 24" fill="none" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M12 3v12"/><path d="M7 8l5-5 5 5"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/>
+  </svg>
+  <div class="dz-title">Choose or drop an SVG file</div>
+  <div class="dz-sub">Works right from Photos, Files, or a share sheet</div>
+  <button class="choose-btn" id="chooseBtn" type="button">Choose File</button>
+  <input type="file" id="fileInput" accept=".svg,image/svg+xml">
+</div>
+
+<div id="fileMeta">
+  <span id="fileMetaText"></span>
+  <button id="clearBtn" type="button">CLEAR</button>
+</div>
+
+<div id="errorBox"></div>
+
+<div class="tabs" id="tabs">
+  <button class="tab active" data-tab="text" type="button">Text content</button>
+  <button class="tab" data-tab="raw" type="button">Raw XML</button>
+</div>
+
+<div id="resultWrap">
+  <span id="resultLabel">Extracted text</span>
+  <textarea id="output" readonly spellcheck="false"></textarea>
+  <div class="actions">
+    <button id="copyBtn" type="button">Copy</button>
+    <button id="downloadBtn" type="button">Download .txt</button>
+  </div>
+</div>
+
+<footer>everything runs in this page — no upload, no server</footer>
+
+<script>
+(function(){
+  const dropzone = document.getElementById('dropzone');
+  const fileInput = document.getElementById('fileInput');
+  const chooseBtn = document.getElementById('chooseBtn');
+  const fileMeta = document.getElementById('fileMeta');
+  const fileMetaText = document.getElementById('fileMetaText');
+  const clearBtn = document.getElementById('clearBtn');
+  const tabs = document.getElementById('tabs');
+  const resultWrap = document.getElementById('resultWrap');
+  const output = document.getElementById('output');
+  const resultLabel = document.getElementById('resultLabel');
+  const copyBtn = document.getElementById('copyBtn');
+  const downloadBtn = document.getElementById('downloadBtn');
+  const errorBox = document.getElementById('errorBox');
+
+  let rawSVG = '';
+  let extractedText = '';
+  let currentTab = 'text';
+  let currentName = 'svg';
+
+  chooseBtn.addEventListener('click', () => fileInput.click());
+  dropzone.addEventListener('click', (e) => { if(e.target === dropzone) fileInput.click(); });
+
+  ['dragenter','dragover'].forEach(evt => {
+    dropzone.addEventListener(evt, e => { e.preventDefault(); dropzone.classList.add('drag'); });
+  });
+  ['dragleave','drop'].forEach(evt => {
+    dropzone.addEventListener(evt, e => { e.preventDefault(); dropzone.classList.remove('drag'); });
+  });
+  dropzone.addEventListener('drop', e => {
+    const f = e.dataTransfer.files && e.dataTransfer.files[0];
+    if (f) handleFile(f);
+  });
+
+  fileInput.addEventListener('change', e => {
+    const f = e.target.files && e.target.files[0];
+    if (f) handleFile(f);
+  });
+
+  clearBtn.addEventListener('click', reset);
+
+  tabs.addEventListener('click', e => {
+    const btn = e.target.closest('.tab');
+    if (!btn) return;
+    currentTab = btn.dataset.tab;
+    [...tabs.children].forEach(t => t.classList.toggle('active', t === btn));
+    render();
+  });
+
+  copyBtn.addEventListener('click', async () => {
+    try {
+      await navigator.clipboard.writeText(output.value);
+      copyBtn.textContent = 'Copied';
+      copyBtn.classList.add('copied');
+      setTimeout(() => { copyBtn.textContent = 'Copy'; copyBtn.classList.remove('copied'); }, 1400);
+    } catch (err) {
+      output.select();
+      document.execCommand('copy');
+    }
+  });
+
+  downloadBtn.addEventListener('click', () => {
+    const suffix = currentTab === 'raw' ? '-source' : '-text';
+    const blob = new Blob([output.value], {type:'text/plain'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = currentName.replace(/\.svg$/i,'') + suffix + '.txt';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  });
+
+  function reset(){
+    rawSVG = ''; extractedText = ''; currentName = 'svg';
+    fileInput.value = '';
+    fileMeta.classList.remove('show');
+    tabs.classList.remove('show');
+    resultWrap.classList.remove('show');
+    errorBox.classList.remove('show');
+  }
+
+  function handleFile(file){
+    errorBox.classList.remove('show');
+    const isSvg = /\.svg$/i.test(file.name) || file.type === 'image/svg+xml';
+    if (!isSvg){
+      showError('That doesn\'t look like an SVG file. Pick a file ending in .svg.');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      rawSVG = String(reader.result || '');
+      currentName = file.name || 'image.svg';
+      try {
+        extractedText = extractText(rawSVG);
+      } catch (err) {
+        extractedText = '';
+      }
+      fileMetaText.textContent = currentName + '  ·  ' + formatBytes(file.size);
+      fileMeta.classList.add('show');
+      tabs.classList.add('show');
+      resultWrap.classList.add('show');
+      currentTab = 'text';
+      [...tabs.children].forEach(t => t.classList.toggle('active', t.dataset.tab === 'text'));
+      render();
+    };
+    reader.onerror = () => showError('Could not read that file. Try again.');
+    reader.readAsText(file);
+  }
+
+  function extractText(svgString){
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(svgString, 'image/svg+xml');
+    const parserError = doc.querySelector('parsererror');
+    if (parserError){
+      throw new Error('parse error');
+    }
+    const nodes = doc.querySelectorAll('text, tspan, title, desc');
+    const seen = new Set();
+    const lines = [];
+    nodes.forEach(node => {
+      if (node.closest && node.tagName.toLowerCase() === 'tspan' && node.parentElement && node.parentElement.tagName.toLowerCase() === 'text'){
+        // avoid double counting tspans separately from parent text later; we handle by only taking leaf text
+      }
+      const t = (node.textContent || '').trim();
+      if (t && !seen.has(node)){
+        lines.push(t);
+        seen.add(node);
+      }
+    });
+    // De-duplicate consecutive identical lines caused by tspan+text overlap
+    const cleaned = [];
+    lines.forEach(l => { if (cleaned[cleaned.length-1] !== l) cleaned.push(l); });
+    return cleaned.join('\n');
+  }
+
+  function render(){
+    if (currentTab === 'raw'){
+      resultLabel.textContent = 'Raw SVG source';
+      output.value = rawSVG;
+    } else {
+      resultLabel.textContent = 'Extracted text';
+      output.value = extractedText || '(No <text> elements found in this SVG — try the Raw XML tab.)';
+    }
+  }
+
+  function showError(msg){
+    errorBox.textContent = msg;
+    errorBox.classList.add('show');
+  }
+
+  function formatBytes(n){
+    if (n < 1024) return n + ' B';
+    if (n < 1024*1024) return (n/1024).toFixed(1) + ' KB';
+    return (n/1024/1024).toFixed(1) + ' MB';
+  }
+})();
+</script>
+</body>
+</html>
