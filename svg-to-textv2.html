@@ -1,0 +1,577 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>SVG Converter</title>
+<link rel="apple-touch-icon" href="icon-180.png">
+<style>
+  :root{
+    --ink:#1b1f1c;
+    --paper:#f6f4ee;
+    --line:#d8d3c4;
+    --moss:#4a5d43;
+    --moss-dark:#38472f;
+    --amber:#c8843a;
+    --mono: 'SF Mono', ui-monospace, 'Menlo', monospace;
+    --serif: 'New York', 'Iowan Old Style', Georgia, serif;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--paper);
+    color:var(--ink);
+    font-family:-apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif;
+    min-height:100dvh;
+    padding: max(20px, env(safe-area-inset-top)) 18px max(28px, env(safe-area-inset-bottom));
+    display:flex;
+    flex-direction:column;
+    gap:16px;
+  }
+  header{ padding-top:6px; }
+  h1{
+    font-family:var(--serif);
+    font-weight:600;
+    font-size:28px;
+    margin:0;
+    line-height:1.15;
+    letter-spacing:-0.01em;
+  }
+  .sub{
+    margin:8px 0 0;
+    font-size:14.5px;
+    line-height:1.5;
+    color:#585b52;
+    max-width:46ch;
+  }
+
+  /* mode switch */
+  .mode-tabs{
+    display:flex;
+    gap:6px;
+  }
+  .mode-tab{
+    flex:1;
+    text-align:center;
+    padding:11px 6px;
+    border-radius:11px;
+    font-size:13.5px;
+    font-weight:600;
+    color:#6d7065;
+    background:#eeece3;
+    border:none;
+  }
+  .mode-tab.active{
+    background:var(--moss);
+    color:#fff;
+  }
+
+  .panel{ display:none; flex-direction:column; gap:16px; }
+  .panel.show{ display:flex; }
+
+  #dropzone{
+    border:1.5px dashed var(--line);
+    border-radius:14px;
+    background:#fffdf8;
+    padding:28px 18px;
+    text-align:center;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:10px;
+    transition: border-color .15s ease, background .15s ease;
+  }
+  #dropzone.drag{
+    border-color:var(--moss);
+    background:#f1f4ec;
+  }
+  #dropzone svg{width:30px;height:30px;stroke:var(--moss);}
+  #dropzone .dz-title{ font-size:15px; font-weight:600; }
+  #dropzone .dz-sub{ font-size:13px; color:#7a7d72; }
+  input[type=file]{ display:none; }
+  .choose-btn{
+    margin-top:4px;
+    background:var(--moss);
+    color:#fff;
+    border:none;
+    padding:10px 18px;
+    border-radius:100px;
+    font-size:14px;
+    font-weight:600;
+    letter-spacing:.01em;
+  }
+  .choose-btn:active{ background:var(--moss-dark); }
+
+  #fileMeta{
+    display:none;
+    font-family:var(--mono);
+    font-size:12.5px;
+    color:var(--moss-dark);
+    background:#eef1e8;
+    border-radius:8px;
+    padding:8px 12px;
+    align-items:center;
+    justify-content:space-between;
+    gap:10px;
+  }
+  #fileMeta.show{ display:flex; }
+  #fileMeta button{
+    background:none;border:none;color:var(--amber);font-family:var(--mono);
+    font-size:12px; font-weight:700; padding:0;
+  }
+
+  #headerNote{
+    display:none;
+    font-family:var(--mono);
+    font-size:10.5px;
+    line-height:1.5;
+    color:#8a8d80;
+    background:#f0efe8;
+    border:1px solid var(--line);
+    border-radius:8px;
+    padding:8px 10px;
+    max-height:70px;
+    overflow-y:auto;
+    word-break:break-word;
+    white-space:pre-wrap;
+  }
+  #headerNote.show{ display:block; }
+  #headerNote .tag{
+    display:block;
+    text-transform:uppercase;
+    letter-spacing:.08em;
+    font-size:9.5px;
+    color:#a3a595;
+    margin-bottom:3px;
+  }
+
+  #resultWrap{ display:none; flex-direction:column; gap:10px; flex:1; min-height:0;}
+  #resultWrap.show{ display:flex; }
+  #resultLabel{
+    font-family:var(--mono);
+    font-size:11px;
+    letter-spacing:.1em;
+    text-transform:uppercase;
+    color:#8a8d80;
+  }
+
+  textarea{
+    width:100%;
+    flex:1;
+    min-height:220px;
+    resize:vertical;
+    background:#fffdf8;
+    border:1px solid var(--line);
+    border-radius:12px;
+    padding:14px;
+    font-family:var(--mono);
+    font-size:12.5px;
+    line-height:1.55;
+    color:#2b2e27;
+  }
+  textarea:focus{ outline:2px solid var(--moss); outline-offset:1px; }
+  textarea::placeholder{ color:#a3a595; font-style:italic; }
+
+  .actions{ display:flex; gap:10px; }
+  .actions button{
+    flex:1;
+    padding:13px 10px;
+    border-radius:11px;
+    font-size:14.5px;
+    font-weight:600;
+    border:none;
+  }
+  .btn-dark{ background:var(--ink); color:#fff; }
+  .btn-dark.copied{ background:var(--amber); }
+  .btn-outline{ background:#fff; color:var(--ink); border:1.5px solid var(--ink); }
+
+  .field-label{
+    font-family:var(--mono);
+    font-size:11px;
+    letter-spacing:.1em;
+    text-transform:uppercase;
+    color:#8a8d80;
+  }
+  .filename-row{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    background:#fffdf8;
+    border:1px solid var(--line);
+    border-radius:10px;
+    padding:4px 4px 4px 12px;
+  }
+  .filename-row span{ font-family:var(--mono); font-size:12.5px; color:#8a8d80; }
+  .filename-row input{
+    flex:1;
+    border:none;
+    background:transparent;
+    font-family:var(--mono);
+    font-size:13px;
+    padding:9px 4px;
+    color:var(--ink);
+    min-width:0;
+  }
+  .filename-row input:focus{ outline:none; }
+
+  #preview{
+    display:none;
+    border:1px solid var(--line);
+    border-radius:12px;
+    background:
+      linear-gradient(45deg,#eceae1 25%,transparent 25%),
+      linear-gradient(-45deg,#eceae1 25%,transparent 25%),
+      linear-gradient(45deg,transparent 75%,#eceae1 75%),
+      linear-gradient(-45deg,transparent 75%,#eceae1 75%);
+    background-size:16px 16px;
+    background-position:0 0,0 8px,8px -8px,-8px 0;
+    align-items:center;
+    justify-content:center;
+    min-height:120px;
+    max-height:180px;
+    padding:14px;
+  }
+  #preview.show{ display:flex; }
+  #preview img{ max-width:100%; max-height:150px; }
+
+  .warn{
+    display:none;
+    background:#fbeaea;
+    color:#8a3131;
+    border:1px solid #e3b6b6;
+    border-radius:10px;
+    padding:10px 12px;
+    font-size:13px;
+  }
+  .warn.show{ display:block; }
+
+  footer{
+    margin-top:auto;
+    text-align:center;
+    font-size:11.5px;
+    color:#a3a595;
+    font-family:var(--mono);
+    padding-top:6px;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>SVG Converter</h1>
+  <p class="sub">Pull the raw markup out of an SVG as text, or turn text markup back into a downloadable SVG.</p>
+</header>
+
+<div class="mode-tabs">
+  <button class="mode-tab active" data-mode="svg2text" type="button">SVG → Text</button>
+  <button class="mode-tab" data-mode="text2svg" type="button">Text → SVG</button>
+</div>
+
+<!-- SVG -> TEXT PANEL -->
+<div class="panel show" id="panelSvg2Text">
+
+  <div id="dropzone">
+    <svg viewBox="0 0 24 24" fill="none" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M12 3v12"/><path d="M7 8l5-5 5 5"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/>
+    </svg>
+    <div class="dz-title">Choose or drop an SVG file</div>
+    <div class="dz-sub">Works right from Photos, Files, or a share sheet</div>
+    <button class="choose-btn" id="chooseBtn" type="button">Choose File</button>
+    <input type="file" id="fileInput" accept=".svg,image/svg+xml">
+  </div>
+
+  <div id="fileMeta">
+    <span id="fileMetaText"></span>
+    <button id="clearBtn" type="button">CLEAR</button>
+  </div>
+
+  <div class="warn" id="errorBox"></div>
+
+  <div id="headerNote"><span class="tag">Detected in source · not included below</span><span id="headerNoteText"></span></div>
+
+  <div id="resultWrap">
+    <span id="resultLabel">Raw XML</span>
+    <textarea id="output" readonly spellcheck="false"></textarea>
+    <div class="actions">
+      <button class="btn-dark" id="copyBtn" type="button">Copy</button>
+      <button class="btn-outline" id="downloadBtn" type="button">Download .txt</button>
+    </div>
+  </div>
+
+</div>
+
+<!-- TEXT -> SVG PANEL -->
+<div class="panel" id="panelText2Svg">
+
+  <div id="dropzoneTxt">
+    <span class="field-label">Load a .txt file, or paste markup below</span>
+    <div style="display:flex; gap:10px;">
+      <button class="choose-btn" id="chooseTxtBtn" type="button" style="flex:1;">Choose .txt File</button>
+      <input type="file" id="txtFileInput" accept=".txt,text/plain">
+    </div>
+  </div>
+
+  <textarea id="svgInput" placeholder="<svg xmlns=&quot;http://www.w3.org/2000/svg&quot; ...>&#10;  ...&#10;</svg>" spellcheck="false"></textarea>
+
+  <div class="warn" id="warnBox">This doesn't look like valid SVG markup. You can still download it, but double-check it before using the file.</div>
+
+  <div id="preview"><img id="previewImg" alt="SVG preview"></div>
+
+  <div>
+    <span class="field-label">File name</span>
+    <div class="filename-row" style="margin-top:6px;">
+      <input type="text" id="filenameInput" value="converted.svg">
+    </div>
+  </div>
+
+  <div class="actions">
+    <button class="btn-dark" id="clearTxtBtn" type="button">Clear</button>
+    <button class="btn-outline" id="downloadSvgBtn" type="button">Download .svg</button>
+  </div>
+
+</div>
+
+<footer>everything runs in this page — no upload, no server</footer>
+
+<script>
+(function(){
+  /* ---------- mode switching ---------- */
+  const modeTabs = document.querySelectorAll('.mode-tab');
+  const panelSvg2Text = document.getElementById('panelSvg2Text');
+  const panelText2Svg = document.getElementById('panelText2Svg');
+  modeTabs.forEach(tab => {
+    tab.addEventListener('click', () => {
+      modeTabs.forEach(t => t.classList.toggle('active', t === tab));
+      const mode = tab.dataset.mode;
+      panelSvg2Text.classList.toggle('show', mode === 'svg2text');
+      panelText2Svg.classList.toggle('show', mode === 'text2svg');
+    });
+  });
+
+  /* ---------- SVG -> TEXT ---------- */
+  const dropzone = document.getElementById('dropzone');
+  const fileInput = document.getElementById('fileInput');
+  const chooseBtn = document.getElementById('chooseBtn');
+  const fileMeta = document.getElementById('fileMeta');
+  const fileMetaText = document.getElementById('fileMetaText');
+  const clearBtn = document.getElementById('clearBtn');
+  const resultWrap = document.getElementById('resultWrap');
+  const output = document.getElementById('output');
+  const copyBtn = document.getElementById('copyBtn');
+  const downloadBtn = document.getElementById('downloadBtn');
+  const errorBox = document.getElementById('errorBox');
+  const headerNote = document.getElementById('headerNote');
+  const headerNoteText = document.getElementById('headerNoteText');
+
+  let docBody = '';
+  let currentName = 'svg';
+
+  chooseBtn.addEventListener('click', () => fileInput.click());
+  dropzone.addEventListener('click', (e) => { if (e.target === dropzone) fileInput.click(); });
+
+  ['dragenter','dragover'].forEach(evt => {
+    dropzone.addEventListener(evt, e => { e.preventDefault(); dropzone.classList.add('drag'); });
+  });
+  ['dragleave','drop'].forEach(evt => {
+    dropzone.addEventListener(evt, e => { e.preventDefault(); dropzone.classList.remove('drag'); });
+  });
+  dropzone.addEventListener('drop', e => {
+    const f = e.dataTransfer.files && e.dataTransfer.files[0];
+    if (f) handleFile(f);
+  });
+  fileInput.addEventListener('change', e => {
+    const f = e.target.files && e.target.files[0];
+    if (f) handleFile(f);
+  });
+  clearBtn.addEventListener('click', resetSvg2Text);
+
+  copyBtn.addEventListener('click', async () => {
+    try {
+      await navigator.clipboard.writeText(output.value);
+      copyBtn.textContent = 'Copied';
+      copyBtn.classList.add('copied');
+      setTimeout(() => { copyBtn.textContent = 'Copy'; copyBtn.classList.remove('copied'); }, 1400);
+    } catch (err) {
+      output.select();
+      document.execCommand('copy');
+    }
+  });
+
+  downloadBtn.addEventListener('click', () => {
+    const blob = new Blob([output.value], {type:'text/plain'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = currentName.replace(/\.svg$/i,'') + '.txt';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  });
+
+  function resetSvg2Text(){
+    docBody = ''; currentName = 'svg';
+    fileInput.value = '';
+    fileMeta.classList.remove('show');
+    resultWrap.classList.remove('show');
+    errorBox.classList.remove('show');
+    headerNote.classList.remove('show');
+  }
+
+  function handleFile(file){
+    errorBox.classList.remove('show');
+    const isSvg = /\.svg$/i.test(file.name) || file.type === 'image/svg+xml';
+    if (!isSvg){
+      showError(errorBox, 'That doesn\'t look like an SVG file. Pick a file ending in .svg.');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      const raw = String(reader.result || '');
+      currentName = file.name || 'image.svg';
+      const { header, body } = splitLeadingHeader(raw);
+
+      docBody = body;
+      output.value = docBody;
+
+      if (header){
+        headerNoteText.textContent = header;
+        headerNote.classList.add('show');
+      } else {
+        headerNote.classList.remove('show');
+      }
+
+      fileMetaText.textContent = currentName + '  ·  ' + formatBytes(file.size);
+      fileMeta.classList.add('show');
+      resultWrap.classList.add('show');
+    };
+    reader.onerror = () => showError(errorBox, 'Could not read that file. Try again.');
+    reader.readAsText(file);
+  }
+
+  // Pulls a leading <?xml ... ?> declaration and/or leading <!-- ... --> comment(s)
+  // off the front of any SVG source, so it can be shown separately and kept
+  // out of the copyable/downloadable body.
+  function splitLeadingHeader(svgString){
+    let s = svgString.replace(/^\uFEFF/, '');
+    const leadingWs = s.match(/^\s*/)[0];
+    let rest = s.slice(leadingWs.length);
+    let consumed = 0;
+
+    const xmlDeclRe = /^<\?xml[^>]*\?>/;
+    const m = rest.match(xmlDeclRe);
+    if (m){
+      consumed += m[0].length;
+      rest = rest.slice(m[0].length);
+    }
+
+    while (true){
+      const ws = rest.match(/^\s*/)[0];
+      const afterWs = rest.slice(ws.length);
+      const c = afterWs.match(/^<!--[\s\S]*?-->/);
+      if (c){
+        consumed += ws.length + c[0].length;
+        rest = afterWs.slice(c[0].length);
+      } else break;
+    }
+
+    const header = s.slice(leadingWs.length, leadingWs.length + consumed).trim();
+    const body = s.slice(leadingWs.length + consumed).replace(/^\s+/, '');
+    return { header, body: body || s };
+  }
+
+  function formatBytes(n){
+    if (n < 1024) return n + ' B';
+    if (n < 1024*1024) return (n/1024).toFixed(1) + ' KB';
+    return (n/1024/1024).toFixed(1) + ' MB';
+  }
+
+  function showError(box, msg){
+    box.textContent = msg;
+    box.classList.add('show');
+  }
+
+  /* ---------- TEXT -> SVG ---------- */
+  const chooseTxtBtn = document.getElementById('chooseTxtBtn');
+  const txtFileInput = document.getElementById('txtFileInput');
+  const svgInput = document.getElementById('svgInput');
+  const warnBox = document.getElementById('warnBox');
+  const preview = document.getElementById('preview');
+  const previewImg = document.getElementById('previewImg');
+  const filenameInput = document.getElementById('filenameInput');
+  const clearTxtBtn = document.getElementById('clearTxtBtn');
+  const downloadSvgBtn = document.getElementById('downloadSvgBtn');
+
+  chooseTxtBtn.addEventListener('click', () => txtFileInput.click());
+  txtFileInput.addEventListener('change', e => {
+    const f = e.target.files && e.target.files[0];
+    if (!f) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      svgInput.value = String(reader.result || '');
+      filenameInput.value = f.name.replace(/\.txt$/i,'') + '.svg';
+      updatePreview();
+    };
+    reader.readAsText(f);
+  });
+
+  let previewTimer = null;
+  svgInput.addEventListener('input', () => {
+    clearTimeout(previewTimer);
+    previewTimer = setTimeout(updatePreview, 250);
+  });
+
+  function updatePreview(){
+    const text = svgInput.value.trim();
+    if (!text){
+      warnBox.classList.remove('show');
+      preview.classList.remove('show');
+      return;
+    }
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(text, 'image/svg+xml');
+    const bad = doc.querySelector('parsererror') || doc.documentElement.tagName.toLowerCase() !== 'svg';
+    if (bad){
+      warnBox.classList.add('show');
+      preview.classList.remove('show');
+      return;
+    }
+    warnBox.classList.remove('show');
+    try {
+      const blob = new Blob([text], {type:'image/svg+xml'});
+      const url = URL.createObjectURL(blob);
+      previewImg.onload = () => URL.revokeObjectURL(url);
+      previewImg.src = url;
+      preview.classList.add('show');
+    } catch (err){
+      preview.classList.remove('show');
+    }
+  }
+
+  clearTxtBtn.addEventListener('click', () => {
+    svgInput.value = '';
+    txtFileInput.value = '';
+    filenameInput.value = 'converted.svg';
+    warnBox.classList.remove('show');
+    preview.classList.remove('show');
+  });
+
+  downloadSvgBtn.addEventListener('click', () => {
+    const text = svgInput.value.trim();
+    if (!text) return;
+    let name = (filenameInput.value || 'converted.svg').trim();
+    if (!/\.svg$/i.test(name)) name += '.svg';
+    const blob = new Blob([svgInput.value], {type:'image/svg+xml'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = name;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  });
+})();
+</script>
+</body>
+</html>
